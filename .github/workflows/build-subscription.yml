@@ -1,0 +1,58 @@
+name: Build Mihomo subscription
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Prepare config
+        run: cp config.example.yaml config.yaml
+
+      - name: Run unit tests
+        run: python3 -m pytest tests -m "not integration" -v
+
+      - name: Run integration test (live sources + mihomo)
+        run: python3 -m pytest tests/test_integration_build.py -v -s
+
+      - name: Build subscription
+        env:
+          WARP_PRIVATE_KEY: ${{ secrets.WARP_PRIVATE_KEY }}
+          WARP_DEVICE_ID: ${{ secrets.WARP_DEVICE_ID }}
+          WARP_ACCESS_TOKEN: ${{ secrets.WARP_ACCESS_TOKEN }}
+        run: |
+          python -m open_proxy_config build -c config.yaml --report-json build-report.json
+
+      - name: Publish to dist branch
+        run: |
+          git fetch origin dist || true
+          mkdir -p publish
+          cp dist/mihomo.yaml dist/provider.yaml publish/
+          if [ -d dist/ovpn ]; then cp -r dist/ovpn publish/; fi
+          cp build-report.json publish/build-report.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan dist-tmp || git checkout dist-tmp
+          git rm -rf . 2>/dev/null || true
+          cp -r publish/* .
+          git add -A
+          git commit -m "chore: update subscription $(date -u +%Y-%m-%dT%H:%MZ)" || echo "no changes"
+          git branch -M dist
+          git push -f origin dist

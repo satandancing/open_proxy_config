@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-proxy-config"
+version = "0.1.0"
+description = "Unified Mihomo/Clash Verge Rev subscription builder (VPN Gate, WARP, public aggregators)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "PyYAML>=6.0.1",
+    "cryptography>=42.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-timeout>=2.3.0",
+]
+
+[project.scripts]
+open-proxy-config = "open_proxy_config.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["open_proxy_config*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 600
+markers = [
+    "integration: live network and mihomo binary tests",
+]

@@ -1,0 +1,7 @@
+proxies:
+  - name: test-ss
+    type: ss
+    server: example.com
+    port: 8388
+    cipher: aes-256-gcm
+    password: secret
