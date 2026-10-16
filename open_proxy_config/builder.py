@@ -15,6 +15,7 @@ from open_proxy_config.sources.aggregator import AggregatorSource
 from open_proxy_config.sources.vpngate import VPNGateSource
 from open_proxy_config.sources.warp import WarpSource
 from open_proxy_config.util.dedupe import dedupe_proxies
+from open_proxy_config.util.metrics import count_by_type
 from open_proxy_config.validation.l1_syntax import filter_valid_proxies
 from open_proxy_config.validation.mihomo_runner import (
     ensure_mihomo,
@@ -87,7 +88,9 @@ def run_build(config: dict[str, Any]) -> BuildReport:
         )
         res = src.fetch()
         report.sources["vpngate"] = {
+            "fetched": len(res.proxies),
             "count": len(res.proxies),
+            "parsed_by_type": count_by_type(res.proxies),
             "errors": res.errors,
         }
         if res.extras.get("ovpn_files"):
@@ -107,7 +110,12 @@ def run_build(config: dict[str, Any]) -> BuildReport:
             client_ipv4=w.get("client_ipv4", "172.16.0.2"),
         )
         res = src.fetch()
-        report.sources["warp"] = {"count": len(res.proxies), "errors": res.errors}
+        report.sources["warp"] = {
+            "fetched": len(res.proxies),
+            "count": len(res.proxies),
+            "parsed_by_type": count_by_type(res.proxies),
+            "errors": res.errors,
+        }
         all_by_source["warp"] = res.proxies
 
     if sources_cfg.get("aggregator", {}).get("enabled", True):
@@ -119,7 +127,9 @@ def run_build(config: dict[str, Any]) -> BuildReport:
         )
         res = src.fetch()
         report.sources["aggregator"] = {
+            "fetched": len(res.proxies),
             "count": len(res.proxies),
+            "parsed_by_type": count_by_type(res.proxies),
             "errors": res.errors,
         }
         all_by_source["aggregator"] = res.proxies
@@ -128,6 +138,8 @@ def run_build(config: dict[str, Any]) -> BuildReport:
     for src_id, proxies in all_by_source.items():
         good, _ = filter_valid_proxies(proxies)
         report.l1_dropped += len(proxies) - len(good)
+        report.sources[src_id]["l1_passed"] = len(good)
+        report.sources[src_id]["l1_passed_by_type"] = count_by_type(good)
         merged.extend(good)
         by_source_names[src_id] = [p["name"] for p in good]
 
@@ -144,12 +156,15 @@ def run_build(config: dict[str, Any]) -> BuildReport:
             concurrency=int(val_cfg.get("concurrency", 8)),
             timeout_seconds=int(val_cfg.get("test_timeout_seconds", 25)),
             skip_openvpn=bool(val_cfg.get("skip_openvpn_l3", True)),
+            openvpn_l3_max=int(val_cfg.get("openvpn_l3_max", 0)),
         )
         report.l3_stats = l3_stats
         for src_id in list(by_source_names.keys()):
             names_set = {p["name"] for p in merged}
+            surviving = [p for p in all_by_source.get(src_id, []) if p["name"] in names_set]
             by_source_names[src_id] = [n for n in by_source_names[src_id] if n in names_set]
             report.sources[src_id]["passed_l3"] = len(by_source_names[src_id])
+            report.sources[src_id]["l3_passed_by_type"] = count_by_type(surviving)
 
     previous = _load_previous_proxies(state_file)
     if not merged:

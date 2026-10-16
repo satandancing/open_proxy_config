@@ -140,23 +140,39 @@ def l3_test_proxies(
     concurrency: int,
     timeout_seconds: int,
     skip_openvpn: bool = True,
+    openvpn_l3_max: int = 0,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     stats: dict[str, Any] = {
         "tested": 0,
         "passed": 0,
         "failed": 0,
         "skipped_openvpn": 0,
+        "openvpn_l3_attempted": 0,
         "l3_method": "mihomo_delay_api",
+        "passed_by_type": {},
+        "failed_by_type": {},
     }
     binary = ensure_mihomo(mihomo_version, cache_dir)
     passed: list[dict[str, Any]] = []
     to_test: list[dict[str, Any]] = []
+    openvpn_l3_count = 0
+
+    def _bump(bucket: dict[str, int], typ: str) -> None:
+        bucket[typ] = bucket.get(typ, 0) + 1
 
     for p in proxies:
-        if skip_openvpn and p.get("type") == "openvpn":
-            stats["skipped_openvpn"] += 1
-            passed.append(p)
-            continue
+        typ = str(p.get("type", "unknown"))
+        if p.get("type") == "openvpn":
+            if skip_openvpn:
+                stats["skipped_openvpn"] += 1
+                passed.append(p)
+                continue
+            if openvpn_l3_max > 0 and openvpn_l3_count >= openvpn_l3_max:
+                stats["skipped_openvpn"] += 1
+                passed.append(p)
+                continue
+            openvpn_l3_count += 1
+            stats["openvpn_l3_attempted"] += 1
         to_test.append(p)
 
     batch_size = max(1, min(concurrency, 16))
@@ -190,14 +206,17 @@ def l3_test_proxies(
                     continue
                 for p in batch:
                     stats["tested"] += 1
+                    typ = str(p.get("type", "unknown"))
                     delay = _proxy_delay_ms(
                         controller_port, p["name"], test_url, timeout_ms
                     )
                     if delay is not None:
                         passed.append(p)
                         stats["passed"] += 1
+                        _bump(stats["passed_by_type"], typ)
                     else:
                         stats["failed"] += 1
+                        _bump(stats["failed_by_type"], typ)
             finally:
                 proc.terminate()
                 try:

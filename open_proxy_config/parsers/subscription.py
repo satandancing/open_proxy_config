@@ -116,7 +116,10 @@ def parse_vmess_uri(uri: str) -> dict[str, Any] | None:
 def parse_vless_uri(uri: str) -> dict[str, Any] | None:
     if not uri.startswith("vless://"):
         return None
-    parsed = urlparse(uri)
+    try:
+        parsed = urlparse(uri)
+    except ValueError:
+        return None
     uuid = parsed.username
     host = parsed.hostname
     port = parsed.port or 443
@@ -139,8 +142,13 @@ def parse_vless_uri(uri: str) -> dict[str, Any] | None:
 def parse_trojan_uri(uri: str) -> dict[str, Any] | None:
     if not uri.startswith("trojan://"):
         return None
-    parsed = urlparse(uri)
+    try:
+        parsed = urlparse(uri)
+    except ValueError:
+        return None
     password = unquote(parsed.username or "")
+    if not parsed.hostname or not password:
+        return None
     name = unquote(parsed.fragment) if parsed.fragment else "trojan"
     return {
         "name": name,
@@ -155,8 +163,10 @@ def parse_trojan_uri(uri: str) -> dict[str, Any] | None:
 def parse_hysteria2_uri(uri: str) -> dict[str, Any] | None:
     if not uri.startswith("hysteria2://") and not uri.startswith("hy2://"):
         return None
-    prefix = "hysteria2://" if uri.startswith("hysteria2://") else "hy2://"
-    parsed = urlparse(uri)
+    try:
+        parsed = urlparse(uri)
+    except ValueError:
+        return None
     password = unquote(parsed.username or "")
     name = unquote(parsed.fragment) if parsed.fragment else "hysteria2"
     return {

@@ -52,6 +52,8 @@ python -m open_proxy_config build -c config.yaml
 - **GitHub Actions**：在仓库 **Secrets** 中配置上述三项；若未配置且 `register_if_missing: true`，工作流会在 runner 上临时注册（凭据仅存在于该次构建产物目录，不会进入 git 历史）。
 
 > WARP 为 **个人免费 WARP** 注册流程，**不是** Cloudflare One / Zero Trust 企业设备自动发现。
+>
+> 注册 API 需使用当前客户端版本（本项目对齐 **wgcf v2 / API `v0a5641`**：`tos` 为 RFC3339 时间戳，并包含 `os_version` / `key_type` / `tunnel_type`）。旧版 `v0a2158` + 固定 `tos: 2022-11-02` 会返回 **HTTP 400 Invalid registration request**。
 
 ## 限制与兼容性
 
