@@ -79,6 +79,12 @@ def test_full_pipeline_with_aggregator_l3(tmp_path: Path) -> None:
     )
     assert report.sources["aggregator"]["fetched"] > 0
     assert report.sources["aggregator"].get("passed_l3", 0) >= 0
+    vg = report.sources.get("vpngate", {})
+    if vg.get("fetched"):
+        assert vg.get("l3_untested", 0) >= 1
+        cfg_text = out.read_text(encoding="utf-8")
+        assert "VPNGate-未测速" in cfg_text
+        assert "[未测速]" in cfg_text
 
 
 @pytest.mark.integration

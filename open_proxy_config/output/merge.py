@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 
 from open_proxy_config.util.naming import _COUNTRY_FLAGS
+from open_proxy_config.util.untested import VPNGATE_UNTESTED_GROUP
 
 
 def _group_by_country(proxies: list[dict[str, Any]]) -> dict[str, list[str]]:
@@ -28,24 +29,38 @@ def build_mihomo_config(
     *,
     by_source: dict[str, list[str]],
     rules: list[str],
+    openvpn_untested_names: list[str] | None = None,
 ) -> str:
     names = [p["name"] for p in proxies]
+    untested = set(openvpn_untested_names or [])
+    auto_candidates = [n for n in names if n not in untested]
     country_groups = _group_by_country(proxies)
+    global_choices = ["AUTO", "DIRECT"]
+    if untested:
+        global_choices.append(VPNGATE_UNTESTED_GROUP)
     proxy_groups: list[dict[str, Any]] = [
         {
             "name": "GLOBAL",
             "type": "select",
-            "proxies": ["AUTO", "DIRECT"] + names[:50],
+            "proxies": global_choices + names[:50],
         },
         {
             "name": "AUTO",
             "type": "url-test",
-            "proxies": names,
+            "proxies": auto_candidates if auto_candidates else names,
             "url": "https://www.gstatic.com/generate_204",
             "interval": 300,
             "tolerance": 50,
         },
     ]
+    if untested:
+        proxy_groups.append(
+            {
+                "name": VPNGATE_UNTESTED_GROUP,
+                "type": "select",
+                "proxies": sorted(untested),
+            }
+        )
     for src, src_names in by_source.items():
         if not src_names:
             continue

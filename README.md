@@ -59,7 +59,10 @@ python -m open_proxy_config build -c config.yaml
 
 - **Shadowrocket** 等不支持 Mihomo `openvpn` 出站的客户端，请仅使用聚合源中的 SS/VMess 等节点，或单独导入 `ovpn` 文件到支持 OpenVPN 的应用。
 - **公开免费节点**由第三方运营，可能存在窃听、劫持、恶意日志；**不要**用于银行、工作账号或任何敏感业务。
-- VPN Gate 节点可用率波动大；OpenVPN 在 CI 中默认仅做 L1/L3 跳过（`skip_openvpn_l3`），以免超时。
+- VPN Gate 节点可用率波动大；OpenVPN 在 CI/默认可用性探测中**不做 L3 delay 测速**（`skip_openvpn_l3: true`），以免超时。这些节点**仍会写入配置**，不会丢弃：
+  - 节点名称追加后缀 **` [未测速]`**
+  - 归入独立策略组 **`VPNGate-未测速`**（`select`），且**不会**进入 `AUTO` url-test 组
+  - 在 `GLOBAL` 中可手动选择 `VPNGate-未测速` 使用；使用前请自行承担可用性风险
 - Mihomo OpenVPN 需要较新版本核心（本项目 CI 固定 **v1.19.32+**）；更旧二进制会报 `unsupport proxy type: openvpn`，请升级 Clash Verge Rev 内置 Mihomo。
 - Mihomo OpenVPN 字段以 [官方文档](https://wiki.metacubex.one/en/config/proxies/openvpn/) 为准；本项目内联 PEM，不依赖本地证书路径。
 

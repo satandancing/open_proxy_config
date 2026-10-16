@@ -16,6 +16,7 @@ from open_proxy_config.sources.vpngate import VPNGateSource
 from open_proxy_config.sources.warp import WarpSource
 from open_proxy_config.util.dedupe import dedupe_proxies
 from open_proxy_config.util.metrics import count_by_type
+from open_proxy_config.util.untested import apply_untested_name_suffix, remap_name_lists
 from open_proxy_config.validation.l1_syntax import filter_valid_proxies
 from open_proxy_config.validation.mihomo_runner import (
     ensure_mihomo,
@@ -159,12 +160,32 @@ def run_build(config: dict[str, Any]) -> BuildReport:
             openvpn_l3_max=int(val_cfg.get("openvpn_l3_max", 0)),
         )
         report.l3_stats = l3_stats
+        untested_raw = set(l3_stats.get("untested_l3_names") or [])
+        if untested_raw:
+            renamed = apply_untested_name_suffix(merged, untested_raw)
+            remap_name_lists(by_source_names, renamed)
+            openvpn_untested_final = [
+                p["name"] for p in merged if p.get("type") == "openvpn" and p["name"].endswith(" [未测速]")
+            ]
+            report.l3_stats["openvpn_untested_marked"] = len(openvpn_untested_final)
+        else:
+            openvpn_untested_final = []
+        names_set = {p["name"] for p in merged}
         for src_id in list(by_source_names.keys()):
-            names_set = {p["name"] for p in merged}
-            surviving = [p for p in all_by_source.get(src_id, []) if p["name"] in names_set]
             by_source_names[src_id] = [n for n in by_source_names[src_id] if n in names_set]
-            report.sources[src_id]["passed_l3"] = len(by_source_names[src_id])
-            report.sources[src_id]["l3_passed_by_type"] = count_by_type(surviving)
+            l3_tested = [
+                p
+                for p in merged
+                if p["name"] in set(by_source_names[src_id])
+                and p["name"] not in set(openvpn_untested_final)
+            ]
+            report.sources[src_id]["passed_l3"] = len(l3_tested)
+            report.sources[src_id]["l3_untested"] = len(
+                [n for n in by_source_names[src_id] if n in openvpn_untested_final]
+            )
+            report.sources[src_id]["l3_passed_by_type"] = count_by_type(l3_tested)
+    else:
+        openvpn_untested_final = []
 
     previous = _load_previous_proxies(state_file)
     if not merged:
@@ -178,7 +199,10 @@ def run_build(config: dict[str, Any]) -> BuildReport:
 
     merge_rules = list(config.get("merge", {}).get("rules", []))
     mihomo_yaml = build_mihomo_config(
-        merged, by_source=by_source_names, rules=merge_rules
+        merged,
+        by_source=by_source_names,
+        rules=merge_rules,
+        openvpn_untested_names=openvpn_untested_final if val_cfg.get("enabled", True) else [],
     )
     provider_yaml = build_provider_yaml(merged)
 

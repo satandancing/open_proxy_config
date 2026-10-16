@@ -151,6 +151,7 @@ def l3_test_proxies(
         "l3_method": "mihomo_delay_api",
         "passed_by_type": {},
         "failed_by_type": {},
+        "untested_l3_names": [],
     }
     binary = ensure_mihomo(mihomo_version, cache_dir)
     passed: list[dict[str, Any]] = []
@@ -165,10 +166,12 @@ def l3_test_proxies(
         if p.get("type") == "openvpn":
             if skip_openvpn:
                 stats["skipped_openvpn"] += 1
+                stats["untested_l3_names"].append(p["name"])
                 passed.append(p)
                 continue
             if openvpn_l3_max > 0 and openvpn_l3_count >= openvpn_l3_max:
                 stats["skipped_openvpn"] += 1
+                stats["untested_l3_names"].append(p["name"])
                 passed.append(p)
                 continue
             openvpn_l3_count += 1
