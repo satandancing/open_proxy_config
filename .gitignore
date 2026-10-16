@@ -1,0 +1,9 @@
+dist/
+.mihomo-cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.warp-account.json
+config.yaml
+*.egg-info/
+.venv/
